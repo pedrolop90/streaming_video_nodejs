@@ -1,43 +1,64 @@
 module.exports = (io) => {
   const fs=require('fs'),
    path=require('path'),
-   ffmpeg=require("ffmpeg");
+   ffmpeg=require("ffmpeg")
+   var val=false,
+   posLectura=1,
+   posEscritura=0,
+   valLectura=true;
+   posEnvio=0,
+   imagenes=[];
    io.on('connection',(socket)=>{
-     /*
-    const ph = path.join(__dirname,'public','videos','Hunterx001.mp4'),
-    stat = fs.statSync(ph),tamaño_video=64536
-     bufferVideo = Buffer.alloc(tamaño_video);
-     socket.emit("datos_video",stat);
-       var start=0;
-       var end=parseInt(tamaño_video,10);
-       const video = fs.createReadStream(ph,{encoding:'base64',start:start,end:end});
-        video.on('data', function (chunk) {
-        //socket.emit("datos",chunk);
-        bufferVideo.write(chunk);
-        socket.emit("datos",Buffer.from(chunk));
-        });
-        video.on('end',function(){
-          //socket.emit("termino",new Uint16Array(bufferVideo));
-        });
-        */
-        	new ffmpeg(path.join(__dirname,'public','videos','Hunterx001.mp4'), function (err, video) {
-        		if (!err) {
-        			console.log('The video is ready to be processed');
-              console.log(path.join(__dirname,'public','imagenes'));
-              video.fnExtractFrameToJPG (path.join(__dirname,'public','imagenes'),{
-                frame_rate : 1,
-			          number : 5,
-			         file_name : 'my_frame_%t_%s'},function (error, files) {
-            			if (error)
-                  console.log(error);
-            				console.log('Frames: ' + files);
-            		});
-        		} else {
-        			console.log('Error: ' + err);
-        		}
-        	});
+          var process = new ffmpeg(path.join(__dirname,'public','videos','Hunterx001.mp4'));
+          process.then(function (video) {
+            video.addCommand('-ss', '00:00:00')
+              video.addCommand("-s","1366x768");
+              //video.addCommand("-c:v","libx264");
+              //video.addCommand("-crf","19");
+              //video.addCommand("-strict","experimental");
+               video.addCommand('-r', '23')
+              //video.addCommand('-vframes', '30')
+              video.addCommand('-filter_complex', '"scale=4096:3112, pad=4097:3112,setdar=4096:3112"')
+            video.save(path.join(__dirname,'public','imagenes',"%d.png"),(err,file)=>{
+              if(err){
+                console.log(err);
+              }
+            });
+            setInterval(()=>{
+                if(valLectura){
+                  valLectura=false;
+                  var prov=fs.createReadStream(path.join(__dirname,"public","imagenes",posLectura+'.jpg'),{encoding:'base64'});
+                  console.log(prov);
+                  imagenes[posLectura]=Buffer.alloc(prov.stats.size);
+                  posLectura++;
+                  prov.on('data', function (data) {
+                    if(!valLectura){
+                      prov.pipe(imagenes[posEscritura]);
+                    }
+                  });
+                  prov.on("end",()=>{
+                    console.log(imagenes.length);
+                    posLectura++;
+                    posEscritura++;
+                    valLectura=true;
+                  });
+                  prov.on("error",(err)=>{
+                  });
+                }
 
+              if(!val){
+                fs.readdir(path.join(__dirname,'public','imagenes'),(err,files)=>{
+                  if(files.lenght>90){
+                    val=true;
+                  }
+                });
+              }else{
 
+              }
+            },10);
+          }, function (err) {
+            console.log('Error: ' + err);
+          });
 
   });
 }
